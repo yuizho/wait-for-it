@@ -9,7 +9,7 @@ usage()
 {
     cat << USAGE >&2
 Usage:
-    $WAITFORIT_cmdname host:port [-s] [-t timeout] [-- command args]
+    $WAITFORIT_cmdname [-u url] [-s] [-t timeout] [-- command args]
     -u URL | --url=URL          Url under test
     -s | --strict               Only execute subcommand if the test succeeds
     -q | --quiet                Don't output any status messages
