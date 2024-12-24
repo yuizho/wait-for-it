@@ -9,7 +9,6 @@ import pytest
 
 MISSING_ARGS_TEXT = "Error: you need to provide a url to test."
 HELP_TEXT = "Usage:"  # Start of help text
-DIVIDE_LINE = '-'*71  # Output line of dashes
 
 def execute(cmd):
     """Executes a command and returns exit code, STDOUT, STDERR"""
