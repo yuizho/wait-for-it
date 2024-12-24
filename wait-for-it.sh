@@ -10,9 +10,7 @@ usage()
     cat << USAGE >&2
 Usage:
     $WAITFORIT_cmdname host:port [-s] [-t timeout] [-- command args]
-    -h HOST | --host=HOST       Host or IP under test
-    -p PORT | --port=PORT       TCP port under test
-                                Alternatively, you specify the host and port as host:port
+    -u URL | --url=URL          Url under test
     -s | --strict               Only execute subcommand if the test succeeds
     -q | --quiet                Don't output any status messages
     -t TIMEOUT | --timeout=TIMEOUT
@@ -25,23 +23,18 @@ USAGE
 wait_for()
 {
     if [[ $WAITFORIT_TIMEOUT -gt 0 ]]; then
-        echoerr "$WAITFORIT_cmdname: waiting $WAITFORIT_TIMEOUT seconds for $WAITFORIT_HOST:$WAITFORIT_PORT"
+        echoerr "$WAITFORIT_cmdname: waiting $WAITFORIT_TIMEOUT seconds for $WAITFORIT_URL"
     else
-        echoerr "$WAITFORIT_cmdname: waiting for $WAITFORIT_HOST:$WAITFORIT_PORT without a timeout"
+        echoerr "$WAITFORIT_cmdname: waiting for $WAITFORIT_URL without a timeout"
     fi
     WAITFORIT_start_ts=$(date +%s)
     while :
     do
-        if [[ $WAITFORIT_ISBUSY -eq 1 ]]; then
-            nc -z $WAITFORIT_HOST $WAITFORIT_PORT
-            WAITFORIT_result=$?
-        else
-            (echo -n > /dev/tcp/$WAITFORIT_HOST/$WAITFORIT_PORT) >/dev/null 2>&1
-            WAITFORIT_result=$?
-        fi
+        curl -s $WAITFORIT_URL > /dev/null
+        WAITFORIT_result=$?
         if [[ $WAITFORIT_result -eq 0 ]]; then
             WAITFORIT_end_ts=$(date +%s)
-            echoerr "$WAITFORIT_cmdname: $WAITFORIT_HOST:$WAITFORIT_PORT is available after $((WAITFORIT_end_ts - WAITFORIT_start_ts)) seconds"
+            echoerr "$WAITFORIT_cmdname: $WAITFORIT_URL is available after $((WAITFORIT_end_ts - WAITFORIT_start_ts)) seconds"
             break
         fi
         sleep 1
@@ -53,16 +46,16 @@ wait_for_wrapper()
 {
     # In order to support SIGINT during timeout: http://unix.stackexchange.com/a/57692
     if [[ $WAITFORIT_QUIET -eq 1 ]]; then
-        timeout $WAITFORIT_BUSYTIMEFLAG $WAITFORIT_TIMEOUT $0 --quiet --child --host=$WAITFORIT_HOST --port=$WAITFORIT_PORT --timeout=$WAITFORIT_TIMEOUT &
+        timeout $WAITFORIT_TIMEOUT $0 --quiet --child --url=$WAITFORIT_URL--timeout=$WAITFORIT_TIMEOUT &
     else
-        timeout $WAITFORIT_BUSYTIMEFLAG $WAITFORIT_TIMEOUT $0 --child --host=$WAITFORIT_HOST --port=$WAITFORIT_PORT --timeout=$WAITFORIT_TIMEOUT &
+        timeout $WAITFORIT_TIMEOUT $0 --child --url=$WAITFORIT_URL --timeout=$WAITFORIT_TIMEOUT &
     fi
     WAITFORIT_PID=$!
     trap "kill -INT -$WAITFORIT_PID" INT
     wait $WAITFORIT_PID
     WAITFORIT_RESULT=$?
     if [[ $WAITFORIT_RESULT -ne 0 ]]; then
-        echoerr "$WAITFORIT_cmdname: timeout occurred after waiting $WAITFORIT_TIMEOUT seconds for $WAITFORIT_HOST:$WAITFORIT_PORT"
+        echoerr "$WAITFORIT_cmdname: timeout occurred after waiting $WAITFORIT_TIMEOUT seconds for $WAITFORIT_URL"
     fi
     return $WAITFORIT_RESULT
 }
@@ -71,10 +64,13 @@ wait_for_wrapper()
 while [[ $# -gt 0 ]]
 do
     case "$1" in
-        *:* )
-        WAITFORIT_hostport=(${1//:/ })
-        WAITFORIT_HOST=${WAITFORIT_hostport[0]}
-        WAITFORIT_PORT=${WAITFORIT_hostport[1]}
+        -u)
+        WAITFORIT_URL="$2"
+        if [[ $WAITFORIT_URL == "" ]]; then break; fi
+        shift 2
+        ;;
+        --url=*)
+        WAITFORIT_URL="${1#*=}"
         shift 1
         ;;
         --child)
@@ -87,24 +83,6 @@ do
         ;;
         -s | --strict)
         WAITFORIT_STRICT=1
-        shift 1
-        ;;
-        -h)
-        WAITFORIT_HOST="$2"
-        if [[ $WAITFORIT_HOST == "" ]]; then break; fi
-        shift 2
-        ;;
-        --host=*)
-        WAITFORIT_HOST="${1#*=}"
-        shift 1
-        ;;
-        -p)
-        WAITFORIT_PORT="$2"
-        if [[ $WAITFORIT_PORT == "" ]]; then break; fi
-        shift 2
-        ;;
-        --port=*)
-        WAITFORIT_PORT="${1#*=}"
         shift 1
         ;;
         -t)
@@ -131,8 +109,8 @@ do
     esac
 done
 
-if [[ "$WAITFORIT_HOST" == "" || "$WAITFORIT_PORT" == "" ]]; then
-    echoerr "Error: you need to provide a host and port to test."
+if [[ "$WAITFORIT_URL" == "" ]]; then
+    echoerr "Error: you need to provide a url to test."
     usage
 fi
 
@@ -140,22 +118,6 @@ WAITFORIT_TIMEOUT=${WAITFORIT_TIMEOUT:-15}
 WAITFORIT_STRICT=${WAITFORIT_STRICT:-0}
 WAITFORIT_CHILD=${WAITFORIT_CHILD:-0}
 WAITFORIT_QUIET=${WAITFORIT_QUIET:-0}
-
-# Check to see if timeout is from busybox?
-WAITFORIT_TIMEOUT_PATH=$(type -p timeout)
-WAITFORIT_TIMEOUT_PATH=$(realpath $WAITFORIT_TIMEOUT_PATH 2>/dev/null || readlink -f $WAITFORIT_TIMEOUT_PATH)
-
-WAITFORIT_BUSYTIMEFLAG=""
-if [[ $WAITFORIT_TIMEOUT_PATH =~ "busybox" ]]; then
-    WAITFORIT_ISBUSY=1
-    # Check if busybox timeout uses -t flag
-    # (recent Alpine versions don't support -t anymore)
-    if timeout &>/dev/stdout | grep -q -e '-t '; then
-        WAITFORIT_BUSYTIMEFLAG="-t"
-    fi
-else
-    WAITFORIT_ISBUSY=0
-fi
 
 if [[ $WAITFORIT_CHILD -gt 0 ]]; then
     wait_for
