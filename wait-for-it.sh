@@ -109,6 +109,11 @@ do
     esac
 done
 
+if ! command -v curl &> /dev/null; then
+    echoerr "Error: This script requres curl. Please install it before running this script."
+    exit 1
+fi
+
 if [[ "$WAITFORIT_URL" == "" ]]; then
     echoerr "Error: you need to provide a url to test."
     usage
