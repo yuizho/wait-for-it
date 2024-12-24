@@ -70,6 +70,16 @@ $ echo $?
 124
 ```
 
-## Community
+## For developers
 
-_Debian_: There is a [Debian package](https://tracker.debian.org/pkg/wait-for-it).
+### Tests for wait-for-it
+
+If you haven't installed rye, follow the procedure below to install it.
+
+https://rye.astral.sh/guide/installation/
+
+To run the basic tests:
+
+```
+rye run pytest
+```
