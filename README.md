@@ -1,5 +1,7 @@
 # wait-for-it
 
+![test workflow](https://github.com/yuizho/wait-for-it/actions/workflows/test.yml/badge.svg)
+
 `wait-for-it.sh` is a pure bash script that will wait on the availability of a
 Http server. It is useful for synchronizing the spin-up of
 interdependent services, such as linked docker containers. Since it is a pure
